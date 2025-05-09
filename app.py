@@ -1,6 +1,6 @@
 import streamlit as st
 import numpy as np
-import tensorflow_probability as tfp
+from scipy.stats import lognorm
 import matplotlib.pyplot as plt
 
 # ==============================
@@ -9,12 +9,11 @@ import matplotlib.pyplot as plt
 st.title("🧮 Calculadora de Priors LogNormal")
 
 st.markdown("""
-Esta aplicación te ayuda a calcular los parámetros `loc` y `scale` de una distribución **LogNormal**
-a partir de la media y la desviación estándar reales que necesitas.
+Esta aplicación calcula los parámetros `loc` y `scale` de una distribución **LogNormal**
+a partir de la media y la desviación estándar reales que defines.
 
 🔍 **¿Para qué sirve?**
-Ideal para configurar priors en modelos de Marketing Mix Modeling (MMM), como Meridian u otros,
-donde necesitas definir una distribución LogNormal a partir de tu conocimiento previo (por ejemplo, ROI esperado).
+Perfecta para configurar priors en modelos de Marketing Mix Modeling (MMM), como Meridian o cualquier otro que use LogNormal.
 
 ---
 """)
@@ -27,14 +26,14 @@ media_real = st.number_input(
     min_value=0.0001, 
     value=2.0, 
     step=0.1,
-    help="La media real que quieres para la distribución (por ejemplo, ROI esperado)."
+    help="Por ejemplo, el ROI esperado o cualquier parámetro positivo."
 )
 desviacion_real = st.number_input(
     "👉 Desviación estándar real deseada (debe ser > 0):", 
     min_value=0.0001, 
     value=1.0, 
     step=0.1,
-    help="La desviación estándar real que quieres para la distribución (incertidumbre esperada)."
+    help="La incertidumbre que asumes sobre ese parámetro."
 )
 
 # ==============================
@@ -51,20 +50,24 @@ if st.button("Calcular loc y scale"):
         st.success(f"✅ **loc (μ_log): {loc:.4f}**")
         st.success(f"✅ **scale (σ_log): {scale:.4f}**")
 
-        # Crear la distribución LogNormal para verificar los valores
-        dist = tfp.distributions.LogNormal(loc=loc, scale=scale)
+        # Crear la distribución LogNormal con scipy.stats.lognorm
+        # En scipy: s=scale (σ_log), scale=np.exp(loc), loc=0 siempre
+        dist = lognorm(s=scale, scale=np.exp(loc))
 
-        st.info(f"📈 **Verificación:** Media real: {dist.mean().numpy():.4f}, Desviación real: {dist.stddev().numpy():.4f}")
+        # Comprobamos media y desviación real
+        media_real_check = dist.mean()
+        desviacion_real_check = dist.std()
+        st.info(f"📈 **Verificación:** Media real: {media_real_check:.4f}, Desviación real: {desviacion_real_check:.4f}")
 
         # ==============================
         # GRÁFICA DE LA DISTRIBUCIÓN
         # ==============================
         x_max = media_real + 4 * desviacion_real
-        x = np.linspace(0, x_max, 500)
-        y = dist.prob(x)
+        x = np.linspace(0.001, x_max, 500)
+        y = dist.pdf(x)
 
         fig, ax = plt.subplots()
-        ax.plot(x, y, label="LogNormal")
+        ax.plot(x, y, label="LogNormal PDF")
         ax.set_title("Distribución LogNormal generada")
         ax.set_xlabel("Valor")
         ax.set_ylabel("Densidad de probabilidad")
@@ -74,3 +77,4 @@ if st.button("Calcular loc y scale"):
 
     except Exception as e:
         st.error(f"Ocurrió un error: {e}")
+
